@@ -11,22 +11,30 @@ export const useImageUpload = () => {
     try {
       setIsUploading(true);
       setError('');
-
-      // 验证文件
+      // 验证文件（放宽为 image/*）
       const validation = validateImageFile(file);
       if (!validation.isValid) {
         setError(validation.error || '文件验证失败');
         return;
       }
 
-      // 压缩图片
-      const compressedFile = await compressImage(file, 1024, 1024, 0.8);
-      
-      // 创建预览URL
-      const url = URL.createObjectURL(compressedFile);
-      
-      setSelectedImage(compressedFile);
-      setPreviewUrl(url);
+      // 立即设置原文件，先显示预览
+      const immediateUrl = URL.createObjectURL(file);
+      setSelectedImage(file);
+      setPreviewUrl(immediateUrl);
+
+      // 后台尝试压缩，成功再替换
+      try {
+        const compressedFile = await compressImage(file, 1024, 1024, 0.8);
+        const newUrl = URL.createObjectURL(compressedFile);
+        // 替换为压缩后的文件与预览
+        setSelectedImage(compressedFile);
+        setPreviewUrl(newUrl);
+        // 释放旧URL
+        URL.revokeObjectURL(immediateUrl);
+      } catch (_) {
+        // 压缩失败则保留原文件与预览
+      }
     } catch (error) {
       console.error('图片处理失败:', error);
       setError('图片处理失败，请重试');

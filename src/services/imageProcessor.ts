@@ -44,7 +44,8 @@ export const compressImage = async (
               });
               resolve(compressedFile);
             } else {
-              reject(new Error('Failed to compress image'));
+              // 有些环境下可能返回null，降级保留原文件
+              resolve(file);
             }
           },
           'image/jpeg',

@@ -32,6 +32,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     if (file) {
       handleFileSelect(file);
     }
+    // 清空以确保选择同一张图片时也能触发变更
+    event.target.value = '';
   };
 
   // 处理拖拽事件
