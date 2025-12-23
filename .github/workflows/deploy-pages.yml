@@ -35,7 +35,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build (set base path for Pages)
-        run: pnpm run build -- --base=/the-other-you/
+        run: pnpm exec vite build --base=/the-other-you/
 
       - name: Create SPA 404 fallback
         run: cp dist/index.html dist/404.html
