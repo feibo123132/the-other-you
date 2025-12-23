@@ -110,13 +110,13 @@ interface OptionCardProps {
 
 const OptionCard: React.FC<OptionCardProps> = ({ option, isSelected, onClick }) => {
   // 处理触摸事件
-  const handleTouchStart = (event: React.TouchEvent) => {
+  const handleTouchStart = (event: React.TouchEvent<HTMLButtonElement>) => {
     const element = event.currentTarget;
     element.style.transform = 'scale(0.95)';
     element.style.transition = 'transform 0.1s ease';
   };
 
-  const handleTouchEnd = (event: React.TouchEvent) => {
+  const handleTouchEnd = (event: React.TouchEvent<HTMLButtonElement>) => {
     const element = event.currentTarget;
     element.style.transform = 'scale(1)';
     setTimeout(() => {

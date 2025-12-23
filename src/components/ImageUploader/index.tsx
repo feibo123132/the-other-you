@@ -56,7 +56,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   // 处理触摸事件（移动端支持）
-  const handleTouchStart = (event: React.TouchEvent) => {
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     event.preventDefault();
     // 移动端触摸反馈
     const element = event.currentTarget;
@@ -64,7 +64,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     element.style.transition = 'transform 0.1s ease';
   };
 
-  const handleTouchEnd = (event: React.TouchEvent) => {
+  const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
     event.preventDefault();
     // 恢复触摸状态
     const element = event.currentTarget;
