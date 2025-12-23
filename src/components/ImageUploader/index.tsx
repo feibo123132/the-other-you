@@ -57,16 +57,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   // 处理触摸事件（移动端支持）
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    // 移动端触摸反馈
     const element = event.currentTarget;
     element.style.transform = 'scale(0.98)';
     element.style.transition = 'transform 0.1s ease';
   };
 
   const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    // 恢复触摸状态
     const element = event.currentTarget;
     element.style.transform = 'scale(1)';
     setTimeout(() => {
@@ -116,12 +112,16 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
             onTouchEnd={handleTouchEnd}
           >
             <input
+              id="file-input"
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              capture="environment"
               onChange={handleFileInputChange}
-              className="hidden"
+              className="sr-only"
             />
+
+            <label htmlFor="file-input" className="absolute inset-0" />
             
             <div className="flex flex-col items-center justify-center h-full p-6 text-center">
               <motion.div
