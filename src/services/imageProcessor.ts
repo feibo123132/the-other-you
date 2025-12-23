@@ -52,7 +52,10 @@ export const compressImage = async (
         );
       };
       
-      img.onerror = () => reject(new Error('Failed to load image'));
+      img.onerror = () => {
+        // 当浏览器无法解码（如HEIC），降级为返回原文件
+        resolve(file);
+      };
       img.src = event.target?.result as string;
     };
     
@@ -84,16 +87,15 @@ export const downloadImage = async (imageUrl: string, fileName: string = 'ai-tra
 
 // 验证图片文件
 export const validateImageFile = (file: File): { isValid: boolean; error?: string } => {
-  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
   const maxSize = 10 * 1024 * 1024; // 10MB
-  
-  if (!validTypes.includes(file.type)) {
-    return { isValid: false, error: '请上传 JPG、PNG 或 WebP 格式的图片' };
+
+  if (!file.type.startsWith('image/')) {
+    return { isValid: false, error: '请选择图片文件' };
   }
-  
+
   if (file.size > maxSize) {
     return { isValid: false, error: '图片大小不能超过 10MB' };
   }
-  
+
   return { isValid: true };
 };
