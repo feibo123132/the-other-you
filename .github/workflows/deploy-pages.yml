@@ -37,6 +37,9 @@ jobs:
       - name: Build (set base path for Pages)
         run: pnpm run build -- --base=/the-other-you/
 
+      - name: Create SPA 404 fallback
+        run: cp dist/index.html dist/404.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
