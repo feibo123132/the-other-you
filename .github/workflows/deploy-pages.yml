@@ -22,7 +22,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -33,7 +35,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build (set base path for Pages)
-        run: pnpm run build -- --base=/${{ github.event.repository.name }}/
+        run: pnpm run build -- --base=/the-other-you/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -50,4 +52,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
