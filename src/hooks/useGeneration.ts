@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { GenerationTask, TransformOption } from '../types/transform';
+import { startGeneration, subscribeProgress, fetchResult } from '../services/imageProcessor';
 import { mockAIService } from '../services/mockAI';
 
 export const useGeneration = () => {
@@ -30,22 +31,51 @@ export const useGeneration = () => {
 
       setCurrentTask(task);
 
-      // 模拟进度更新
-      const progressGenerator = mockAIService.generateImageWithProgress(
-        originalImage,
-        selectedOption
-      );
+      setProgress(10);
+      setProgressMessage('提交任务...');
 
-      for await (const update of progressGenerator) {
-        setProgress(update.progress);
-        setProgressMessage(update.message);
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('读取图片失败'));
+        reader.readAsDataURL(originalImage);
+      });
+
+      const taskId = await startGeneration(selectedOption.promptTemplate, dataUrl, 0.5);
+
+      let es: EventSource | null = null;
+      es = subscribeProgress(taskId, (u) => {
+        setProgress(u.progress);
+        setProgressMessage(u.message);
+      });
+
+      // 可选：若排队/生成较久，使用本地 Mock 占位
+      const fallbackTimer = setTimeout(async () => {
+        if (progress < 30) {
+          const progressGenerator = mockAIService.generateImageWithProgress(originalImage, selectedOption);
+          for await (const update of progressGenerator) {
+            setProgress(update.progress);
+            setProgressMessage(update.message);
+          }
+          const mockUrl = await mockAIService.generateImage(originalImage, selectedOption);
+          setCurrentTask(prev => prev ? { ...prev, resultImage: mockUrl } : prev);
+        }
+      }, 3000);
+
+      let resultImage: string = '';
+      // 轮询真实结果直到完成
+      for (;;) {
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          resultImage = await fetchResult(taskId);
+          break;
+        } catch (e) {
+          const msg = String((e as any)?.message || e);
+          if (!msg.includes('未完成')) throw e;
+        }
       }
-
-      // 生成图片
-      const resultImage = await mockAIService.generateImage(
-        originalImage,
-        selectedOption
-      );
+      clearTimeout(fallbackTimer);
+      if (es) es.close();
 
       // 更新任务状态
       const completedTask: GenerationTask = {
@@ -54,6 +84,8 @@ export const useGeneration = () => {
         resultImage,
       };
 
+      setProgress(100);
+      setProgressMessage('完成！');
       setCurrentTask(completedTask);
       return completedTask;
     } catch (error) {
