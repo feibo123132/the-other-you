@@ -4,6 +4,7 @@ const axios = require('axios');
 require('dotenv').config({ path: '.env.local' });
 const { Signer } = require('@volcengine/openapi');
 const FormData = require('form-data');
+const crypto = require('crypto');
 
 const HOST = 'visual.volcengineapi.com';
 const REGION = 'cn-north-1';
@@ -12,7 +13,8 @@ const VERSION = '2022-08-31';
 const PORT = process.env.PORT || 8787;
 
 const app = express();
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 app.use(cors());
 
 // 日志中间件
@@ -45,26 +47,81 @@ async function signAndPost(action, body) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+function computeDedupeKey(prompt, imageUrl, requestId) {
+  if (requestId) return String(requestId);
+  const raw = imageUrl
+    ? (imageUrl.startsWith('data:') ? (imageUrl.split(',')[1] || imageUrl) : imageUrl)
+    : 'NO_IMAGE';
+  const s = `${prompt || ''}|${raw}`;
+  return crypto.createHash('sha256').update(s).digest('hex');
+}
+
 async function uploadToTempHost(base64Str) {
   const m = base64Str.match(/^data:(.*?);base64,(.*)$/);
   const mime = m ? m[1] : 'image/jpeg';
   const b64 = m ? m[2] : base64Str;
   const buf = Buffer.from(b64, 'base64');
   const ext = (mime.split('/')[1] || 'jpg').toLowerCase();
-  const form = new FormData();
-  form.append('file', buf, { filename: `image.${ext}`, contentType: mime });
-  const resp = await axios.post('https://tmpfiles.org/api/v1/upload', form, {
-    headers: form.getHeaders(),
-    timeout: 30000,
-    maxContentLength: Infinity,
-    maxBodyLength: Infinity,
-  });
-  let pageUrl = resp.data && (resp.data.data?.url || resp.data.url || resp.data.data?.file_url);
-  if (!pageUrl) throw new Error('临时图床未返回 URL');
-  const seg = pageUrl.split('tmpfiles.org/')[1];
-  const id = seg ? seg.replace(/^\/+/, '').replace(/\/+$/, '') : '';
-  const directUrl = id ? `https://tmpfiles.org/dl/${id}` : pageUrl;
-  return directUrl;
+
+  async function uploadToTmpfiles(buffer) {
+    const form = new FormData();
+    form.append('file', buffer, { filename: `image.${ext}`, contentType: mime });
+    const resp = await axios.post('https://tmpfiles.org/api/v1/upload', form, {
+      headers: form.getHeaders(),
+      timeout: 30000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      validateStatus: () => true,
+    });
+    if (resp.status < 200 || resp.status >= 300) {
+      throw new Error(`tmpfiles ${resp.status}`);
+    }
+    const pageUrl = resp.data && (resp.data.data?.url || resp.data.url || resp.data.data?.file_url);
+    if (!pageUrl) throw new Error('tmpfiles no url');
+    const seg = pageUrl.split('tmpfiles.org/')[1];
+    const id = seg ? seg.replace(/^\/+/, '').replace(/\/+$/, '') : '';
+    const directUrl = id ? `https://tmpfiles.org/dl/${id}` : pageUrl;
+    return directUrl;
+  }
+
+  async function uploadTo0x0(buffer) {
+    const form = new FormData();
+    form.append('file', buffer, { filename: `image.${ext}`, contentType: mime });
+    const resp = await axios.post('https://0x0.st', form, {
+      headers: form.getHeaders(),
+      timeout: 30000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      responseType: 'text',
+      validateStatus: () => true,
+    });
+    if (resp.status < 200 || resp.status >= 300) {
+      throw new Error(`0x0.st ${resp.status}`);
+    }
+    const url = (resp.data || '').trim();
+    if (!/^https?:\/\//.test(url)) throw new Error('0x0.st no url');
+    return url;
+  }
+
+  const maxRetries = 2;
+  let lastErr;
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await uploadToTmpfiles(buf);
+    } catch (e) {
+      lastErr = e;
+      await sleep(1000 * (i + 1));
+    }
+  }
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await uploadTo0x0(buf);
+    } catch (e) {
+      lastErr = e;
+      await sleep(1000 * (i + 1));
+    }
+  }
+  throw new Error(`上传失败: ${lastErr?.message || 'unknown'}`);
 }
 
 // ---------------- 队列系统 ----------------
@@ -74,6 +131,7 @@ const sseClients = new Map();
 let workerRunning = false;
 let activeSubmits = 0;
 const MAX_CONCURRENT_SUBMIT = 1;
+const submissions = new Map();
 
 function broadcast(taskId, payload) {
   const set = sseClients.get(taskId);
@@ -141,6 +199,7 @@ async function startWorker() {
         image_urls: [finalImageUrl],
         scale: 0.5,
         logo_info: { add_logo: false },
+        force_single: true,
       };
       
       const submitResp = await submitWithRetry(submitBody, timeoutMs);
@@ -214,18 +273,30 @@ async function startWorker() {
 app.post('/api/generate', async (req, res) => {
   const { prompt, imageUrl } = req.body || {};
   const fallbackImage = 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=800&h=800&fit=crop';
+  for (const [k, v] of submissions) { if ((Date.now() - v.ts) > 60000) submissions.delete(k); }
+  const reqId = req.headers['x-request-id'];
+  const key = computeDedupeKey(prompt, imageUrl, reqId);
+  const existing = submissions.get(key);
+  if (existing && (Date.now() - existing.ts) < 10000) {
+    return res.json({ taskId: existing.id });
+  }
+  const id = Date.now().toString();
+  submissions.set(key, { id, ts: Date.now() });
   let finalImageUrl;
   if (imageUrl && imageUrl.startsWith('data:')) {
     try {
+      console.log(`📷 收到 Base64，长度=${imageUrl.length}`);
       finalImageUrl = await uploadToTempHost(imageUrl);
+      console.log(`🌐 上传成功，直链=${finalImageUrl}`);
     } catch (e) {
-      console.error('临时图床上传失败:', e.message);
-      return res.status(500).json({ error: '临时图床上传失败' });
+      const msg = e?.message || 'unknown';
+      submissions.delete(key);
+      console.error('临时图床上传失败:', msg);
+      return res.status(500).json({ error: 'upload_failed', detail: msg });
     }
   } else {
     finalImageUrl = imageUrl || fallbackImage;
   }
-  const id = Date.now().toString();
   console.log(`➕ 任务入队: ${id}`);
   tasks.set(id, { status: 'queued', progress: 0, message: '排队中...' });
   queue.push({ id, prompt, finalImageUrl });
@@ -263,4 +334,4 @@ app.get('/api/result/:taskId', (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true, port: PORT }));
 
-app.listen(PORT, () => console.log(`server started on http://127.0.0.1:${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`server started on http://0.0.0.0:${PORT}`));

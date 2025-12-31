@@ -113,7 +113,8 @@ const Result: React.FC = () => {
             <div className="space-y-3">
               <motion.button
                 onClick={handleRegenerate}
-                className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-3 px-4 rounded-xl font-medium"
+                disabled={isGenerating}
+                className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-3 px-4 rounded-xl font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
