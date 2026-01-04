@@ -1,47 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingView from '../../components/LoadingView';
 import ResultCard from '../../components/ResultCard';
-import { useGeneration } from '../../hooks/useGeneration';
-import { TransformOption } from '../../types/transform';
-
-interface LocationState {
-  originalImage: File;
-  selectedOption: TransformOption;
-}
+import { useGenerationContext } from '../../context/GenerationContext';
 
 const Result: React.FC = () => {
-  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { generateImage, currentTask, isGenerating, progress, progressMessage } = useGeneration();
-  const [originalImageUrl, setOriginalImageUrl] = useState<string>('');
+  const { getTask, startTask } = useGenerationContext();
+  const taskId = searchParams.get('id');
+  const task = taskId ? getTask(taskId) : null;
+  const [isRetrying, setIsRetrying] = useState(false);
 
-  // 获取传递的数据
-  const state = location.state as LocationState;
-
+  // 如果没有ID或找不到任务，重定向回首页
   useEffect(() => {
-    if (!state?.originalImage || !state?.selectedOption) {
-      navigate('/');
-      return;
+    if (!taskId || !task) {
+      // 可以在这里加个 toast 提示“任务不存在”
+      // navigate('/');
     }
+  }, [taskId, task, navigate]);
 
-    const url = URL.createObjectURL(state.originalImage);
-    setOriginalImageUrl(url);
-
-    generateImage(state.originalImage, state.selectedOption);
-
-    return () => {
-      if (url) {
-        URL.revokeObjectURL(url);
-      }
-    };
-  }, []);
-
-  // 处理重新生成
+  // 处理重新生成 (这里稍微复杂，因为要创建新任务)
   const handleRegenerate = async () => {
-    if (state?.originalImage && state?.selectedOption) {
-      await generateImage(state.originalImage, state.selectedOption);
+    if (task && task.selectedOption) {
+      setIsRetrying(true);
+      try {
+        // 需要 Original Image File 对象。
+        // 但持久化后我们只有 DataURL。
+        // 如果我们想支持重试，我们需要把 DataURL 转回 Blob/File，或者修改 startTask 支持 DataURL。
+        // 简单起见，这里演示 DataURL -> Blob
+        const res = await fetch(task.originalImageUrl);
+        const blob = await res.blob();
+        const file = new File([blob], "retry.jpg", { type: blob.type });
+
+        const newTaskId = await startTask(file, task.selectedOption);
+        navigate(`/result?id=${newTaskId}`);
+      } catch (e) {
+        console.error("Retry failed", e);
+        alert("重新生成失败");
+      } finally {
+        setIsRetrying(false);
+      }
     }
   };
 
@@ -50,24 +50,31 @@ const Result: React.FC = () => {
     navigate('/');
   };
 
-  // 如果没有状态数据，显示加载中
-  if (!state) {
-    return <div>加载中...</div>;
+  if (!task) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        <div className="text-center">
+          <p className="mb-4">找不到该任务</p>
+          <button onClick={handleBack} className="text-primary-600 hover:underline">返回首页</button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <AnimatePresence mode="wait">
-      {isGenerating ? (
+      {task.status === 'processing' || task.status === 'pending' ? (
         // 加载状态
         <motion.div
           key="loading"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          className="w-full h-screen" 
         >
-          <LoadingView progress={progress} message={progressMessage} />
+          <LoadingView progress={task.progress} message={task.progressMessage} onBack={handleBack} />
         </motion.div>
-      ) : currentTask?.status === 'completed' && currentTask.resultImage ? (
+      ) : task.status === 'completed' && task.resultImage ? (
         // 结果展示
         <motion.div
           key="result"
@@ -76,9 +83,9 @@ const Result: React.FC = () => {
           exit={{ opacity: 0 }}
         >
           <ResultCard
-            originalImage={originalImageUrl}
-            resultImage={currentTask.resultImage}
-            selectedOption={currentTask.selectedOption}
+            originalImage={task.originalImageUrl}
+            resultImage={task.resultImage}
+            selectedOption={task.selectedOption}
             onRegenerate={handleRegenerate}
             onBack={handleBack}
           />
@@ -113,12 +120,12 @@ const Result: React.FC = () => {
             <div className="space-y-3">
               <motion.button
                 onClick={handleRegenerate}
-                disabled={isGenerating}
+                disabled={isRetrying}
                 className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-3 px-4 rounded-xl font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                重新生成
+                {isRetrying ? '提交中...' : '重新生成'}
               </motion.button>
               
               <motion.button

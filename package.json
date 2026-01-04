@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "check": "tsc -b --noEmit",
-    "server": "node server/index.js"
+    "server": "node server/index.js",
+    "start": "concurrently -k -n \"后端,前端\" -c \"blue,green\" \"pnpm run server\" \"pnpm run dev --host\""
   },
   "dependencies": {
     "@volcengine/openapi": "^1.0.1",
@@ -35,6 +36,7 @@
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.21",
     "babel-plugin-react-dev-locator": "^1.0.0",
+    "concurrently": "^9.2.1",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",

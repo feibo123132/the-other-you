@@ -12,7 +12,8 @@ export const useGeneration = () => {
 
   const generateImage = useCallback(async (
     originalImage: File,
-    selectedOption: TransformOption
+    selectedOption: TransformOption,
+    customPrompt?: string
   ) => {
     try {
       setIsGenerating(true);
@@ -41,7 +42,7 @@ export const useGeneration = () => {
         reader.readAsDataURL(originalImage);
       });
 
-      const taskId = await startGeneration(selectedOption.promptTemplate, dataUrl, 0.5);
+      const taskId = await startGeneration(customPrompt || selectedOption.promptTemplate, dataUrl, 0.5);
 
       let es: EventSource | null = null;
       es = subscribeProgress(taskId, (u) => {

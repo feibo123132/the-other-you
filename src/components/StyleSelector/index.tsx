@@ -2,68 +2,50 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TransformOption } from '../../types/transform';
 import { getOptionsByCategory } from '../../config/options';
+import { CATEGORY_ORDER, CATEGORY_LABELS, CategoryKey } from '../../config/categories';
 
 interface StyleSelectorProps {
   selectedOption: TransformOption | null;
-  onOptionSelect: (option: TransformOption) => void;
+  onOptionSelect: (option: TransformOption | null) => void;
 }
 
 const StyleSelector: React.FC<StyleSelectorProps> = ({ 
   selectedOption, 
   onOptionSelect 
 }) => {
-  const [activeCategory, setActiveCategory] = useState<'style' | 'location'>('style');
+  const [activeCategory, setActiveCategory] = useState<CategoryKey>('style');
 
-  const styleOptions = getOptionsByCategory('style');
-  const locationOptions = getOptionsByCategory('location');
+  const categories: { key: CategoryKey; label: string }[] = CATEGORY_ORDER.map(key => ({ key, label: CATEGORY_LABELS[key] }));
+  const currentOptions = getOptionsByCategory(activeCategory).slice().sort((a,b)=> (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
 
   return (
     <div className="w-full space-y-6">
       {/* 分类选择器 */}
       <div className="flex bg-gray-100 rounded-2xl p-1">
-        <motion.button
-          className={`
-            flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 relative
-            ${activeCategory === 'style' 
-              ? 'text-white' 
-              : 'text-gray-600 hover:text-gray-800'
-            }
-          `}
-          onClick={() => setActiveCategory('style')}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          {activeCategory === 'style' && (
-            <motion.div
-              layoutId="categoryBackground"
-              className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl z-0"
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            />
-          )}
-          <span className="relative z-10">风格变换</span>
-        </motion.button>
-        
-        <motion.button
-          className={`
-            flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 relative
-            ${activeCategory === 'location' 
-              ? 'text-white' 
-              : 'text-gray-600 hover:text-gray-800'
-            }
-          `}
-          onClick={() => setActiveCategory('location')}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          {activeCategory === 'location' && (
-            <motion.div
-              layoutId="categoryBackground"
-              className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl z-0"
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            />
-          )}
-          <span className="relative z-10">打卡模式</span>
-        </motion.button>
+        {categories.map((c) => (
+          <motion.button
+            key={c.key}
+            className={`
+              flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 relative
+              ${activeCategory === c.key 
+                ? 'text-white' 
+                : 'text-gray-600 hover:text-gray-800'
+              }
+            `}
+            onClick={() => setActiveCategory(c.key as any)}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {activeCategory === c.key && (
+              <motion.div
+                layoutId="categoryBackground"
+                className="absolute inset-0 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl z-0"
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10">{c.label}</span>
+          </motion.button>
+        ))}
       </div>
 
       {/* 选项网格 */}
@@ -76,25 +58,14 @@ const StyleSelector: React.FC<StyleSelectorProps> = ({
           transition={{ duration: 0.3 }}
           className="grid grid-cols-3 gap-4"
         >
-          {activeCategory === 'style' ? (
-            styleOptions.map((option) => (
-              <OptionCard
-                key={option.id}
-                option={option}
-                isSelected={selectedOption?.id === option.id}
-                onClick={() => onOptionSelect(option)}
-              />
-            ))
-          ) : (
-            locationOptions.map((option) => (
-              <OptionCard
-                key={option.id}
-                option={option}
-                isSelected={selectedOption?.id === option.id}
-                onClick={() => onOptionSelect(option)}
-              />
-            ))
-          )}
+          {currentOptions.map((option) => (
+            <OptionCard
+              key={option.id}
+              option={option}
+              isSelected={selectedOption?.id === option.id}
+              onClick={() => onOptionSelect(selectedOption?.id === option.id ? null : option)}
+            />
+          ))}
         </motion.div>
       </AnimatePresence>
     </div>

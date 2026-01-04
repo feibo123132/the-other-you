@@ -2,18 +2,23 @@ export interface TransformOption {
   id: string;
   label: string;
   icon: string;
-  category: 'style' | 'location';
+  category: 'style' | 'location' | 'portrait' | 'celebrity' | 'time_travel' | 'dream_jobs' | 'trendy_hair';
   promptTemplate: string;
   previewImage?: string;
+  sortIndex?: number;
 }
 
 export interface GenerationTask {
   id: string;
-  originalImage: File;
+  originalImage?: File; // Keep for compatibility, but prefer originalImageUrl for persistence
+  originalImageUrl: string; // Base64 or URL
   selectedOption: TransformOption;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   resultImage?: string;
-  createdAt: Date;
+  createdAt: number; // Changed to number for easier JSON serialization
+  completedAt?: number;
+  progress: number;
+  progressMessage: string;
 }
 
 export interface GenerationState {
