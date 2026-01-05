@@ -10,10 +10,8 @@ export interface TransformOption {
 
 export interface GenerationTask {
   id: string;
-  originalImage?: File; // Deprecated, kept for legacy compatibility
-  originalImageUrl?: string; // Deprecated, kept for legacy compatibility
-  originalImages?: File[]; // New: Store multiple files
-  originalImageUrls: string[]; // New: Store multiple Base64/URLs
+  originalImage?: File; // Keep for compatibility, but prefer originalImageUrl for persistence
+  originalImageUrl: string; // Base64 or URL
   selectedOption: TransformOption;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   resultImage?: string;

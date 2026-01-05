@@ -25,9 +25,12 @@ export const useGeneration = () => {
       const task: GenerationTask = {
         id: Date.now().toString(),
         originalImage,
+        originalImageUrl: '', // 初始化为空
         selectedOption,
         status: 'processing',
-        createdAt: new Date(),
+        createdAt: Date.now(),
+        progress: 0,
+        progressMessage: '准备开始...',
       };
 
       setCurrentTask(task);
