@@ -93,7 +93,6 @@ const OptionCard: React.FC<OptionCardProps> = ({ option, isSelected, onClick }) 
     setTimeout(() => {
       element.style.transition = '';
     }, 100);
-    onClick();
   };
 
   return (

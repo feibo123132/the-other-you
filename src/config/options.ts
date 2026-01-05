@@ -66,7 +66,7 @@ export const transformOptions: TransformOption[] = [
     category: 'style',
     promptTemplate: 'Irasutoya style, flat illustration',
   },
-  // 打卡模式
+  // 旅游打卡
   {
     id: 'tiananmen',
     label: '天安门',
@@ -148,18 +148,26 @@ export const transformOptions: TransformOption[] = [
   // 明星合照
   {
     id: 'celebrity',
-    label: '明星合照',
-    icon: '⭐',
+    label: '海边搂肩',
+    icon: '🏖️',
     category: 'celebrity',
     promptTemplate: '将提供的两张人物照片合成为一张亲密的合影：两人自然互动（搂肩），色调微暖、轻微暗角与过曝感，真实海边随手拍氛围。',
   },
   {
     id: 'celebrity-pailide',
-    label: '明星合照·拍立得',
+    label: '搂肩·拍立得',
     icon: '💃',
     category: 'celebrity',
     promptTemplate: '将提供的两张人物照片合成为一张亲密合影的拍立得：白色相纸边框（底部留白），纸面为细腻磨砂颗粒；两人自然互动（搂肩），色调微暖、轻微暗角与过曝感，真实派对随手拍氛围。只输出一张合成图，不要分别生成多张。',
   },
+  {
+    id: 'celebrity-mirror',
+    label: '镜中碰手',
+    icon: '🪞',
+    category: 'celebrity',
+    promptTemplate: '帮我生成一张图片,画面左侧以图一的人物生成,是一位背对镜头的人物,正面向浴室镜子。伸出手与图二人物即将触碰,镜子里映出的是图二的形象（原比例！！！人物的面部模样不做任何改变！！！）,目光相对,以第二张照片为准,场景是一间浴室,可见白色洗手池、银色水龙头,背景还有玻璃材质的淋浴间。整体光线偏亮,人物和浴室的现实部分处于阴影与微光的对比中,而镜中的京剧猫则因光影聚焦显得更为突出,明亮色调的画面风格强化了神秘、自信的气质',
+  },
+
   // 穿梭时空
   {
     id: 'time-child',

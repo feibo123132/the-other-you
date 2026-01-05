@@ -12,7 +12,7 @@ export const CATEGORY_ORDER: CategoryKey[] = [
 
 export const CATEGORY_LABELS: Record<CategoryKey, string> = {
   style: '热门玩法',
-  location: '打卡模式',
+  location: '旅游打卡',
   portrait: '人物写真',
   celebrity: '明星合照',
   time_travel: '穿梭时空',
