@@ -74,6 +74,51 @@ export const validateImageFile = (file: File): { isValid: boolean; error?: strin
   return { isValid: true };
 };
 
+// 合并图片
+export const mergeImages = async (files: File[]): Promise<string> => {
+  if (files.length === 0) throw new Error('No images to merge');
+  if (files.length === 1) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(files[0]);
+    });
+  }
+
+  // Load all images
+  const images = await Promise.all(files.map(file => {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error(`Failed to load image ${file.name}`));
+      img.src = URL.createObjectURL(file);
+    });
+  }));
+
+  // Calculate canvas size (horizontal layout)
+  // For better result, we might want to scale them to same height
+  const totalWidth = images.reduce((sum, img) => sum + img.width, 0);
+  const maxHeight = Math.max(...images.map(img => img.height));
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = totalWidth;
+  canvas.height = maxHeight;
+  const ctx = canvas.getContext('2d');
+  
+  if (!ctx) throw new Error('Failed to get canvas context');
+
+  let currentX = 0;
+  images.forEach(img => {
+    ctx.drawImage(img, currentX, 0);
+    currentX += img.width;
+    // Clean up object URL
+    // URL.revokeObjectURL(img.src); // Be careful when revoking if used elsewhere
+  });
+
+  return canvas.toDataURL('image/jpeg', 0.9);
+};
+
 // ============================================================
 // 🚀 API 调用核心 (全部修改为直连 127.0.0.1)
 // ============================================================

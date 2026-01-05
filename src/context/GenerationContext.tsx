@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { GenerationTask, TransformOption } from '../types/transform';
-import { startGeneration, subscribeProgress, fetchResult } from '../services/imageProcessor';
+import { startGeneration, subscribeProgress, fetchResult, mergeImages } from '../services/imageProcessor';
 import { mockAIService } from '../services/mockAI';
 
 interface GenerationContextType {
   tasks: GenerationTask[];
-  startTask: (originalImage: File, selectedOption: TransformOption, customPrompt?: string) => Promise<string>;
+  startTask: (originalImages: File[], selectedOption: TransformOption, customPrompt?: string) => Promise<string>;
   getTask: (taskId: string) => GenerationTask | undefined;
   removeTask: (taskId: string) => void;
   resetTasks: () => void;
@@ -147,20 +147,24 @@ export const GenerationProvider: React.FC<{ children: ReactNode }> = ({ children
   }, []); // 依赖为空，确保只在挂载时运行一次
 
 
-  const startTask = async (originalImage: File, selectedOption: TransformOption, customPrompt?: string): Promise<string> => {
+  const startTask = async (originalImages: File[], selectedOption: TransformOption, customPrompt?: string): Promise<string> => {
     // 检查并发限制
     const runningCount = tasks.filter(t => t.status === 'processing').length;
     if (runningCount >= MAX_CONCURRENT_TASKS) {
       throw new Error(`同时进行的任务不能超过 ${MAX_CONCURRENT_TASKS} 个`);
     }
 
-    // 图片转 Base64 用于持久化
-    const dataUrl: string = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('读取图片失败'));
-      reader.readAsDataURL(originalImage);
-    });
+    if (originalImages.length === 0) {
+      throw new Error('请至少选择一张图片');
+    }
+
+    // 图片合并转 Base64 用于持久化
+    let dataUrl: string;
+    try {
+      dataUrl = await mergeImages(originalImages);
+    } catch (e) {
+      throw new Error('处理图片失败');
+    }
 
     // 乐观更新：先创建 Task 占位
     const tempId = Date.now().toString();

@@ -34,7 +34,7 @@ const Result: React.FC = () => {
         const blob = await res.blob();
         const file = new File([blob], "retry.jpg", { type: blob.type });
 
-        const newTaskId = await startTask(file, task.selectedOption);
+        const newTaskId = await startTask([file], task.selectedOption);
         navigate(`/result?id=${newTaskId}`);
       } catch (e) {
         console.error("Retry failed", e);

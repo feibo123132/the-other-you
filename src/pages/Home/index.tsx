@@ -12,9 +12,7 @@ import { useGenerationContext } from '../../context/GenerationContext';
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const { startTask, tasks } = useGenerationContext();
-  const { selectedImage: img1, handleImageSelect: select1, handleImageRemove: remove1 } = useImageUpload();
-  const { selectedImage: img2, handleImageSelect: select2, handleImageRemove: remove2 } = useImageUpload();
-  const { selectedImage: img3, handleImageSelect: select3, handleImageRemove: remove3 } = useImageUpload();
+  const { selectedImages, previewUrls, handleImageSelect, handleImageRemove } = useImageUpload();
   const [selectedOption, setSelectedOption] = useState<TransformOption | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [isTaskListOpen, setIsTaskListOpen] = useState(false);
@@ -38,11 +36,10 @@ const Home: React.FC = () => {
 
   // 处理生成按钮点击
   const handleGenerate = async () => {
-    const chosen = img1 || img2 || img3;
     const hasPrompt = customPrompt.trim().length > 0 || !!selectedOption;
-    if (chosen && hasPrompt && selectedOption) {
+    if (selectedImages.length > 0 && hasPrompt && selectedOption) {
       try {
-        await startTask(chosen, selectedOption, customPrompt.trim());
+        await startTask(selectedImages, selectedOption, customPrompt.trim());
         // 不跳转，仅打开任务列表或者提示
         setIsTaskListOpen(true);
       } catch (error: any) {
@@ -52,7 +49,7 @@ const Home: React.FC = () => {
   };
 
   // 检查是否可以生成
-  const canGenerate = (img1 || img2 || img3) && (selectedOption || customPrompt.trim().length > 0);
+  const canGenerate = selectedImages.length > 0 && (selectedOption || customPrompt.trim().length > 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-secondary-50 to-accent-50">
@@ -143,23 +140,16 @@ const Home: React.FC = () => {
           <div className="flex items-center mb-3 sm:mb-4">
             <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-primary-500 mr-2" />
             <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
-              第一步：上传照片
+              第一步：上传照片 (支持最多3张)
             </h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="relative">
-              <span className="absolute top-2 left-2 bg-gray-800/70 text-white text-xs px-2 py-1 rounded">图1</span>
-              <ImageUploader onImageSelect={select1} selectedImage={img1} onImageRemove={remove1} />
-            </div>
-            <div className="relative">
-              <span className="absolute top-2 left-2 bg-gray-800/70 text-white text-xs px-2 py-1 rounded">图2</span>
-              <ImageUploader onImageSelect={select2} selectedImage={img2} onImageRemove={remove2} />
-            </div>
-            <div className="relative">
-              <span className="absolute top-2 left-2 bg-gray-800/70 text-white text-xs px-2 py-1 rounded">图3</span>
-              <ImageUploader onImageSelect={select3} selectedImage={img3} onImageRemove={remove3} />
-            </div>
-          </div>
+          <ImageUploader 
+            onImageSelect={handleImageSelect} 
+            selectedImages={selectedImages} 
+            previewUrls={previewUrls}
+            onImageRemove={handleImageRemove} 
+            maxImages={3}
+          />
         </motion.section>
 
         {/* 风格选择区域 */}
