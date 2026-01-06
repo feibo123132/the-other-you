@@ -8,6 +8,10 @@ import TaskListModal from '../../components/TaskListModal';
 import { useImageUpload } from '../../hooks/useImageUpload';
 import { TransformOption } from '../../types/transform';
 import { useGenerationContext } from '../../context/GenerationContext';
+import { getOptionById } from '../../config/options';
+
+const STORAGE_PROMPT_KEY = 'THE_OTHER_YOU_DRAFT_PROMPT';
+const STORAGE_STYLE_KEY = 'THE_OTHER_YOU_DRAFT_STYLE';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -17,6 +21,32 @@ const Home: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [isTaskListOpen, setIsTaskListOpen] = useState(false);
   
+  // 初始化：恢复 Prompt 和 Style
+  useEffect(() => {
+    const savedPrompt = localStorage.getItem(STORAGE_PROMPT_KEY);
+    if (savedPrompt) setCustomPrompt(savedPrompt);
+
+    const savedStyleId = localStorage.getItem(STORAGE_STYLE_KEY);
+    if (savedStyleId) {
+      const option = getOptionById(savedStyleId);
+      if (option) setSelectedOption(option);
+    }
+  }, []);
+
+  // 持久化 Prompt
+  useEffect(() => {
+    localStorage.setItem(STORAGE_PROMPT_KEY, customPrompt);
+  }, [customPrompt]);
+
+  // 持久化 Style
+  useEffect(() => {
+    if (selectedOption) {
+      localStorage.setItem(STORAGE_STYLE_KEY, selectedOption.id);
+    } else {
+      localStorage.removeItem(STORAGE_STYLE_KEY);
+    }
+  }, [selectedOption]);
+
   // 状态标签逻辑
   const processingCount = tasks.filter(t => t.status === 'processing').length;
   const [showCompletedLabel, setShowCompletedLabel] = useState(false);
@@ -36,10 +66,38 @@ const Home: React.FC = () => {
 
   // 处理生成按钮点击
   const handleGenerate = async () => {
-    const hasPrompt = customPrompt.trim().length > 0 || !!selectedOption;
-    if (selectedImages.length > 0 && hasPrompt && selectedOption) {
+    const hasPrompt = customPrompt.trim().length > 0;
+    const hasStyle = !!selectedOption;
+
+    if (selectedImages.length > 0 && (hasPrompt || hasStyle)) {
       try {
-        await startTask(selectedImages, selectedOption, customPrompt.trim());
+        let finalOption: TransformOption;
+        let finalPrompt: string | undefined;
+
+        if (hasStyle && hasPrompt) {
+          // Case 1: 风格 + 自定义 Prompt -> 拼接，且覆盖 Label 以显示在任务列表
+          finalPrompt = `${customPrompt.trim()}, ${selectedOption!.promptTemplate}`;
+          finalOption = {
+            ...selectedOption!,
+            label: '自定义风格' // 或 `自定义: ${selectedOption!.label}`
+          };
+        } else if (hasStyle && !hasPrompt) {
+          // Case 2: 仅风格 -> 正常使用
+          finalPrompt = undefined;
+          finalOption = selectedOption!;
+        } else {
+          // Case 3: 仅自定义 Prompt -> 创建虚拟风格对象
+          finalPrompt = customPrompt.trim();
+          finalOption = {
+            id: 'custom',
+            label: '自定义风格',
+            icon: '✨',
+            category: 'style',
+            promptTemplate: '' // 不会被使用，因为 passed customPrompt
+          };
+        }
+
+        await startTask(selectedImages, finalOption, finalPrompt);
         // 不跳转，仅打开任务列表或者提示
         setIsTaskListOpen(true);
       } catch (error: any) {
@@ -185,7 +243,16 @@ const Home: React.FC = () => {
             placeholder="在此输入自定义 Prompt（留空则使用所选风格）"
             className="w-full min-h-[100px] rounded-xl border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
-          <div className="text-xs text-gray-500 mt-2">优先使用自定义 Prompt；为空时使用所选风格提示词</div>
+          <div className="flex justify-between items-center mt-2">
+            <div className="text-xs text-gray-500">优先使用自定义 Prompt；为空时使用所选风格提示词</div>
+            <button
+              onClick={() => navigate('/prompts')}
+              className="text-xs flex items-center gap-1 px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg hover:bg-primary-100 transition-colors font-medium"
+            >
+              <Sparkles className="w-3 h-3" />
+              打开 Prompt 库
+            </button>
+          </div>
         </motion.section>
 
         {/* 生成按钮 */}
