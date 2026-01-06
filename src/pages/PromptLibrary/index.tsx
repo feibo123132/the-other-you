@@ -2,13 +2,23 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Copy, Check, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { promptLibrary } from '../../data/promptLibrary';
+import { promptLibrary, PromptCategory } from '../../data/promptLibrary';
 
 const STORAGE_PROMPT_KEY = 'THE_OTHER_YOU_DRAFT_PROMPT';
 
+const CATEGORIES: { id: PromptCategory; label: string }[] = [
+  { id: 'gameplay', label: '热门玩法' },
+  { id: 'portrait', label: '人物写真' },
+  { id: 'group', label: '明星合照' },
+  { id: 'travel', label: '旅游打卡' },
+  { id: 'time-travel', label: '穿梭时空' },
+  { id: 'dreamer', label: '大梦想家' },
+  { id: 'fashion', label: '潮流发型' },
+];
+
 const PromptLibrary: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'portrait' | 'gameplay'>('portrait');
+  const [activeTab, setActiveTab] = useState<PromptCategory>('gameplay');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleUsePrompt = (content: string) => {
@@ -44,28 +54,21 @@ const PromptLibrary: React.FC = () => {
 
       {/* 内容区域 */}
       <div className="max-w-2xl mx-auto p-4">
-        {/* 标签页切换 */}
-        <div className="flex p-1 bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-          <button
-            onClick={() => setActiveTab('portrait')}
-            className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
-              activeTab === 'portrait' 
-                ? 'bg-primary-50 text-primary-600' 
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            人物写真
-          </button>
-          <button
-            onClick={() => setActiveTab('gameplay')}
-            className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
-              activeTab === 'gameplay' 
-                ? 'bg-primary-50 text-primary-600' 
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            热门玩法
-          </button>
+        {/* 标签页切换 - 可横向滚动 */}
+        <div className="flex p-1 bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-x-auto no-scrollbar">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveTab(cat.id)}
+              className={`flex-none px-4 py-2.5 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
+                activeTab === cat.id 
+                  ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-md' 
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
 
         {/* 列表内容 */}
