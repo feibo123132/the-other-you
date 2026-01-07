@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Camera, Layers, CheckCircle, Loader2 } from 'lucide-react';
+import { Sparkles, Camera, Layers, CheckCircle, Loader2, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ImageUploader from '../../components/ImageUploader';
 import StyleSelector from '../../components/StyleSelector';
@@ -144,6 +144,14 @@ const Home: React.FC = () => {
             className="px-4 py-2 rounded-xl bg-primary-50 hover:bg-primary-100 text-primary-600 text-sm font-medium transition-colors"
           >
             作品展示栏
+          </button>
+
+          <button
+            onClick={() => navigate('/style-universe')}
+            className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-600 text-sm font-medium transition-colors flex items-center gap-1"
+          >
+            <Zap className="w-4 h-4" />
+            风格宇宙
           </button>
 
           <button

@@ -13,10 +13,12 @@
     "start": "concurrently -k -n \"后端,前端\" -c \"blue,green\" \"pnpm run server\" \"pnpm run dev --host\""
   },
   "dependencies": {
+    "@types/dagre": "^0.7.53",
     "@volcengine/openapi": "^1.0.1",
     "axios": "^1.7.9",
     "clsx": "^2.1.1",
     "cors": "^2.8.5",
+    "dagre": "^0.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "form-data": "^4.0.5",
@@ -25,6 +27,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.3.0",
+    "reactflow": "^11.11.4",
     "tailwind-merge": "^3.0.2",
     "zustand": "^5.0.3"
   },
