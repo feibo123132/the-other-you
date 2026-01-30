@@ -11,8 +11,8 @@ const HOST = 'visual.volcengineapi.com';
 const REGION = 'cn-north-1';
 const SERVICE = 'cv';
 const VERSION = '2022-08-31';
-// 强制设为 80，但保留环境变量覆盖能力以适应容器化部署
-const PORT = process.env.PORT || 80;
+// 恢复为 8787，由 Nginx 负责反向代理和 80/443 监听
+const PORT = process.env.PORT || 8787;
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
