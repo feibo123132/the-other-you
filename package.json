@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "check": "tsc -b --noEmit",
-    "server": "node server/index.js",
+    "server": "node server/index.cjs",
     "start:fake": "sudo node fake_site/fake_server.js",
     "start": "concurrently -k -n \"后端,前端\" -c \"blue,green\" \"pnpm run server\" \"pnpm run dev --host\""
   },

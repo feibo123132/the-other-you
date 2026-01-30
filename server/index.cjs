@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const axios = require('axios');
 require('dotenv').config({ path: '.env.local' });
 const { Signer } = require('@volcengine/openapi');
@@ -10,12 +11,23 @@ const HOST = 'visual.volcengineapi.com';
 const REGION = 'cn-north-1';
 const SERVICE = 'cv';
 const VERSION = '2022-08-31';
-const PORT = process.env.PORT || 8787;
+// 强制设为 80，但保留环境变量覆盖能力以适应容器化部署
+const PORT = process.env.PORT || 80;
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 app.use(cors());
+
+// 托管打包后的前端网页
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// 处理单页应用路由：所有找不到的路径都返回 index.html
+// 但排除 /api 开头的请求，避免 API 404 时返回 HTML
+app.get('*', (req, res, next) => {
+  if (req.url.startsWith('/api')) return next();
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
 
 // 日志中间件
 app.use((req, res, next) => {

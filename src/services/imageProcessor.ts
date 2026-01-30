@@ -1,9 +1,9 @@
 // src/services/imageProcessor.ts
 
 // ============================================================
-// 🛑 核心配置：强制直连后端 (硬编码 IP，防止 localhost 解析问题)
+// 🛑 核心配置：生产环境 API 地址
 // ============================================================
-const API_BASE_URL = 'http://192.168.1.3:8787/api'; 
+const API_BASE_URL = 'https://jieyouyuzhou.cn/api'; 
 
 // 图片压缩处理 (保持不变)
 export const compressImage = async (
