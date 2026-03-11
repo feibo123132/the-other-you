@@ -1,7 +1,28 @@
 // test-api.js - 独立的 API 核验脚本
-require('dotenv').config({ path: '.env.local' });
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
 const axios = require('axios');
 const { Signer } = require('@volcengine/openapi');
+
+function loadEnvFile() {
+  const candidates = [
+    path.resolve(__dirname, '.env.local'),
+    path.resolve(__dirname, '.env'),
+    path.resolve(process.cwd(), '.env.local'),
+    path.resolve(process.cwd(), '.env'),
+  ];
+
+  for (const envPath of candidates) {
+    if (fs.existsSync(envPath)) {
+      dotenv.config({ path: envPath });
+      return envPath;
+    }
+  }
+  return null;
+}
+
+const loadedEnvPath = loadEnvFile();
 
 const AK = process.env.VOLC_ACCESSKEY;
 const SK = process.env.VOLC_SECRETKEY;

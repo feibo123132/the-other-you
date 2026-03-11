@@ -9,6 +9,7 @@ import { useImageUpload } from '../../hooks/useImageUpload';
 import { TransformOption } from '../../types/transform';
 import { useGenerationContext } from '../../context/GenerationContext';
 import { getOptionById } from '../../config/options';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const STORAGE_PROMPT_KEY = 'THE_OTHER_YOU_DRAFT_PROMPT';
 const STORAGE_STYLE_KEY = 'THE_OTHER_YOU_DRAFT_STYLE';
@@ -16,6 +17,8 @@ const STORAGE_STYLE_KEY = 'THE_OTHER_YOU_DRAFT_STYLE';
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const { startTask, tasks } = useGenerationContext();
+  const canGenerateByAuth = useAuthStore((state) => state.canGenerate);
+  const currentUser = useAuthStore((state) => state.currentUser);
   const { selectedImages, previewUrls, handleImageSelect, handleImageRemove } = useImageUpload();
   const [selectedOption, setSelectedOption] = useState<TransformOption | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>('');
@@ -66,6 +69,15 @@ const Home: React.FC = () => {
 
   // 处理生成按钮点击
   const handleGenerate = async () => {
+    if (!canGenerateByAuth) {
+      if (!currentUser) {
+        alert('请先登录授权邮箱后再使用AI生图功能');
+      } else {
+        alert('当前账号无AI生图权限，请使用 2421415030@qq.com 登录');
+      }
+      return;
+    }
+
     const hasPrompt = customPrompt.trim().length > 0;
     const hasStyle = !!selectedOption;
 
@@ -107,7 +119,8 @@ const Home: React.FC = () => {
   };
 
   // 检查是否可以生成
-  const canGenerate = selectedImages.length > 0 && (selectedOption || customPrompt.trim().length > 0);
+  const canGenerate =
+    canGenerateByAuth && selectedImages.length > 0 && (selectedOption || customPrompt.trim().length > 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-secondary-50 to-accent-50">

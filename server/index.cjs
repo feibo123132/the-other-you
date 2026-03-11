@@ -1,11 +1,32 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const axios = require('axios');
-require('dotenv').config({ path: '.env.local' });
+const dotenv = require('dotenv');
 const { Signer } = require('@volcengine/openapi');
 const FormData = require('form-data');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+
+function loadEnvFile() {
+  const candidates = [
+    path.resolve(__dirname, '../.env.local'),
+    path.resolve(__dirname, '../.env'),
+    path.resolve(process.cwd(), '.env.local'),
+    path.resolve(process.cwd(), '.env'),
+  ];
+
+  for (const envPath of candidates) {
+    if (fs.existsSync(envPath)) {
+      dotenv.config({ path: envPath });
+      return envPath;
+    }
+  }
+  return null;
+}
+
+const loadedEnvPath = loadEnvFile();
 
 const HOST = 'visual.volcengineapi.com';
 const REGION = 'cn-north-1';
@@ -37,6 +58,145 @@ app.use((req, res, next) => {
 
 const accessKeyId = process.env.VOLC_ACCESSKEY;
 const secretKey = process.env.VOLC_SECRETKEY;
+
+const AUTH_CODE_TTL_SEC = Number(process.env.AUTH_CODE_TTL_SEC || 300);
+const AUTH_SEND_COOLDOWN_SEC = Number(process.env.AUTH_SEND_COOLDOWN_SEC || 60);
+const AUTH_MAX_VERIFY_ATTEMPTS = Number(process.env.AUTH_MAX_VERIFY_ATTEMPTS || 5);
+const AUTH_MAX_SEND_PER_IP_PER_HOUR = Number(process.env.AUTH_MAX_SEND_PER_IP_PER_HOUR || 20);
+const AUTH_SESSION_TTL_SEC = Number(process.env.AUTH_SESSION_TTL_SEC || 86400);
+const AUTH_CODE_TTL_MS = AUTH_CODE_TTL_SEC * 1000;
+const AUTH_SEND_COOLDOWN_MS = AUTH_SEND_COOLDOWN_SEC * 1000;
+const AUTH_IP_WINDOW_MS = 60 * 60 * 1000;
+const AUTH_SESSION_TTL_MS = AUTH_SESSION_TTL_SEC * 1000;
+const ALLOWED_GENERATE_EMAIL = normalizeEmail(process.env.ALLOWED_GENERATE_EMAIL || '2421415030@qq.com');
+
+const authCodeStore = new Map();
+const authSessionStore = new Map();
+const ipSendWindowStore = new Map();
+let smtpTransporter = null;
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function parseBoolEnv(value, defaultValue) {
+  if (value == null) return defaultValue;
+  const v = String(value).trim().toLowerCase();
+  if (v === 'true' || v === '1' || v === 'yes') return true;
+  if (v === 'false' || v === '0' || v === 'no') return false;
+  return defaultValue;
+}
+
+function createVerificationCode() {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+function createSessionToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+function resolveSessionFromRequest(req) {
+  const authHeader = req.headers.authorization;
+  if (typeof authHeader !== 'string' || !authHeader.toLowerCase().startsWith('bearer ')) {
+    return null;
+  }
+  const token = authHeader.slice(7).trim();
+  if (!token) return null;
+
+  const session = authSessionStore.get(token);
+  if (!session) return null;
+  if (Date.now() > session.expiresAt) {
+    authSessionStore.delete(token);
+    return null;
+  }
+  return { token, ...session };
+}
+
+function cleanupAuthStores() {
+  const now = Date.now();
+  for (const [email, record] of authCodeStore) {
+    if (!record || now > record.expiresAt) {
+      authCodeStore.delete(email);
+    }
+  }
+  for (const [token, session] of authSessionStore) {
+    if (!session || now > session.expiresAt) {
+      authSessionStore.delete(token);
+    }
+  }
+  for (const [ip, timestamps] of ipSendWindowStore) {
+    const filtered = timestamps.filter((ts) => now - ts <= AUTH_IP_WINDOW_MS);
+    if (filtered.length > 0) {
+      ipSendWindowStore.set(ip, filtered);
+    } else {
+      ipSendWindowStore.delete(ip);
+    }
+  }
+}
+
+function getSmtpTransporter() {
+  if (smtpTransporter) return smtpTransporter;
+  const host = process.env.QQ_SMTP_HOST || 'smtp.qq.com';
+  const port = Number(process.env.QQ_SMTP_PORT || 465);
+  const secure = parseBoolEnv(process.env.QQ_SMTP_SECURE, port === 465);
+  const user = process.env.QQ_SMTP_USER;
+  const pass = process.env.QQ_SMTP_PASS;
+
+  if (!user || !pass) {
+    throw new Error('QQ SMTP not configured');
+  }
+
+  smtpTransporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+  });
+  return smtpTransporter;
+}
+
+async function sendVerificationEmail(targetEmail, code) {
+  const transporter = getSmtpTransporter();
+  const sender = process.env.QQ_SMTP_FROM || process.env.QQ_SMTP_USER;
+  const subject = '[The Other You] Verification Code';
+  const text = `Verification code: ${code}\nExpires in: ${AUTH_CODE_TTL_SEC} seconds\nDo not share this code.`;
+  const html = `
+    <div style="font-family: Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif; line-height: 1.6; color: #1f2937;">
+      <h2 style="margin: 0 0 12px;">Verification Code</h2>
+      <p style="margin: 0 0 12px;">Your verification code is:</p>
+      <p style="margin: 0 0 12px; font-size: 28px; font-weight: 700; letter-spacing: 4px;">${code}</p>
+      <p style="margin: 0 0 12px;">Expires in: ${AUTH_CODE_TTL_SEC} seconds.</p>
+      <p style="margin: 0;">If this wasn't you, please ignore this email.</p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: sender,
+    to: targetEmail,
+    subject,
+    text,
+    html,
+  });
+}
+
+function describeMailError(error) {
+  const code = error?.code ? ` code=${error.code}` : '';
+  const responseCode = error?.responseCode ? ` responseCode=${error.responseCode}` : '';
+  const command = error?.command ? ` command=${error.command}` : '';
+  return `${error?.message || error}${code}${responseCode}${command}`;
+}
 
 async function signAndPost(action, body) {
   const bodyString = JSON.stringify(body);
@@ -282,7 +442,104 @@ async function startWorker() {
 
 // ---------------- 接口 ----------------
 
+app.post('/api/auth/send-code', async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ message: '请输入有效的邮箱地址' });
+  }
+
+  cleanupAuthStores();
+  const now = Date.now();
+  const existing = authCodeStore.get(email);
+  if (existing && now - existing.lastSentAt < AUTH_SEND_COOLDOWN_MS) {
+    const remainSec = Math.ceil((AUTH_SEND_COOLDOWN_MS - (now - existing.lastSentAt)) / 1000);
+    return res.status(429).json({ message: `请求过于频繁，请在${remainSec}秒后重试` });
+  }
+
+  const ip = getClientIp(req);
+  const sentAtList = ipSendWindowStore.get(ip) || [];
+  const recentSentAt = sentAtList.filter((ts) => now - ts <= AUTH_IP_WINDOW_MS);
+  if (recentSentAt.length >= AUTH_MAX_SEND_PER_IP_PER_HOUR) {
+    return res.status(429).json({ message: '发送过于频繁，请稍后再试' });
+  }
+
+  const code = createVerificationCode();
+  try {
+    await sendVerificationEmail(email, code);
+    authCodeStore.set(email, {
+      code,
+      expiresAt: now + AUTH_CODE_TTL_MS,
+      lastSentAt: now,
+      failedAttempts: 0,
+    });
+    recentSentAt.push(now);
+    ipSendWindowStore.set(ip, recentSentAt);
+    return res.json({ ok: true, expiresIn: AUTH_CODE_TTL_SEC });
+  } catch (error) {
+    console.error('[Auth] send code failed:', describeMailError(error));
+    if (error?.message === 'QQ SMTP not configured') {
+      return res.status(500).json({ message: '服务端未配置QQ SMTP账号，请先完成环境变量配置' });
+    }
+    return res.status(500).json({ message: '验证码发送失败，请稍后重试' });
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const code = String(req.body?.code || '').trim();
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ message: '请输入有效的邮箱地址' });
+  }
+  if (!/^\d{6}$/.test(code)) {
+    return res.status(400).json({ message: '请输入6位数字验证码' });
+  }
+
+  cleanupAuthStores();
+  const record = authCodeStore.get(email);
+  if (!record) {
+    return res.status(400).json({ message: '请先获取验证码' });
+  }
+  if (Date.now() > record.expiresAt) {
+    authCodeStore.delete(email);
+    return res.status(400).json({ message: '验证码已过期，请重新发送' });
+  }
+  if (record.code !== code) {
+    const nextFailedAttempts = (record.failedAttempts || 0) + 1;
+    if (nextFailedAttempts >= AUTH_MAX_VERIFY_ATTEMPTS) {
+      authCodeStore.delete(email);
+      return res.status(400).json({ message: '验证码错误次数过多，请重新发送' });
+    }
+    authCodeStore.set(email, { ...record, failedAttempts: nextFailedAttempts });
+    const leftAttempts = AUTH_MAX_VERIFY_ATTEMPTS - nextFailedAttempts;
+    return res.status(400).json({ message: `验证码错误，还可重试${leftAttempts}次` });
+  }
+
+  authCodeStore.delete(email);
+  const allowGenerate = email === ALLOWED_GENERATE_EMAIL;
+  const token = createSessionToken();
+  authSessionStore.set(token, {
+    email,
+    allowGenerate,
+    expiresAt: Date.now() + AUTH_SESSION_TTL_MS,
+  });
+  return res.json({
+    ok: true,
+    email,
+    token,
+    allowGenerate,
+    sessionExpiresIn: AUTH_SESSION_TTL_SEC,
+  });
+});
 app.post('/api/generate', async (req, res) => {
+  cleanupAuthStores();
+  const session = resolveSessionFromRequest(req);
+  if (!session) {
+    return res.status(401).json({ message: '请先登录后再使用AI生图功能' });
+  }
+  if (!session.allowGenerate || session.email !== ALLOWED_GENERATE_EMAIL) {
+    return res.status(403).json({ message: '当前账号无AI生图权限' });
+  }
+
   const { prompt, imageUrl } = req.body || {};
   const fallbackImage = 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=800&h=800&fit=crop';
   for (const [k, v] of submissions) { if ((Date.now() - v.ts) > 60000) submissions.delete(k); }
@@ -346,4 +603,8 @@ app.get('/api/result/:taskId', (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true, port: PORT }));
 
-app.listen(PORT, '0.0.0.0', () => console.log(`server started on http://0.0.0.0:${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  const smtpConfigured = Boolean(process.env.QQ_SMTP_USER && process.env.QQ_SMTP_PASS);
+  console.log(`server started on http://0.0.0.0:${PORT}`);
+  console.log(`[env] loaded=${loadedEnvPath || 'none'} smtpConfigured=${smtpConfigured}`);
+});

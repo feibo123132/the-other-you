@@ -43,26 +43,26 @@ const TopRightMenu = () => {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50" ref={panelRef}>
+    <div className="fixed top-4 right-4 z-50 flex flex-col items-end" ref={panelRef}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1 px-5 py-2 rounded-2xl border-2 border-slate-900 bg-[#f6eed9] text-[#4b3b2f] text-lg sm:text-xl font-bold shadow-sm hover:shadow-md transition-shadow"
+        className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-white/95 border border-gray-200 text-gray-700 text-sm font-medium shadow-sm hover:shadow-md hover:bg-white transition-all backdrop-blur-sm"
       >
         菜单
         <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
       {isOpen && (
-        <div className="mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-3xl bg-[#f3f3f3] shadow-xl border border-slate-200/90 overflow-hidden">
+        <div className="mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-2xl bg-white/95 shadow-lg border border-gray-100 overflow-hidden backdrop-blur-sm">
           <div className="p-6">
-            <div className="text-base text-slate-500 mb-2 font-medium">当前账号</div>
-            <div className="text-3xl text-slate-800 font-semibold break-all leading-tight">
+            <div className="text-sm text-gray-500 mb-2 font-medium">当前账号</div>
+            <div className="text-2xl text-gray-800 font-semibold break-all leading-tight">
               {currentUser || "未登录"}
             </div>
           </div>
 
-          <div className="h-px bg-slate-200" />
+          <div className="h-px bg-gray-100" />
 
           <div className="p-4">
             {currentUser ? (
@@ -72,7 +72,7 @@ const TopRightMenu = () => {
                   logout();
                   setIsOpen(false);
                 }}
-                className="w-full text-left text-2xl font-semibold text-red-500 hover:text-red-600 transition-colors px-2 py-1"
+                className="w-full text-left text-xl font-semibold text-red-500 hover:text-red-600 transition-colors px-2 py-1"
               >
                 退出登录
               </button>
@@ -83,7 +83,7 @@ const TopRightMenu = () => {
                   setIsOpen(false);
                   navigate("/login");
                 }}
-                className="w-full text-left text-2xl font-semibold text-slate-800 hover:text-slate-950 transition-colors px-2 py-1"
+                className="w-full text-left text-xl font-semibold text-gray-800 hover:text-gray-950 transition-colors px-2 py-1"
               >
                 登录
               </button>
