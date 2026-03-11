@@ -47,17 +47,17 @@ const TopRightMenu = () => {
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-white/95 border border-gray-200 text-gray-700 text-sm font-medium shadow-sm hover:shadow-md hover:bg-white transition-all backdrop-blur-sm"
+        className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white/95 px-4 py-2 text-base font-semibold text-gray-700 shadow-sm backdrop-blur-sm transition-all hover:bg-white hover:shadow-md"
       >
         菜单
-        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
       {isOpen && (
-        <div className="mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-2xl bg-white/95 shadow-lg border border-gray-100 overflow-hidden backdrop-blur-sm">
+        <div className="mt-3 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-gray-100 bg-white/95 shadow-lg backdrop-blur-sm">
           <div className="p-6">
-            <div className="text-sm text-gray-500 mb-2 font-medium">当前账号</div>
-            <div className="text-2xl text-gray-800 font-semibold break-all leading-tight">
+            <div className="mb-2 text-base font-semibold text-gray-500">当前账号</div>
+            <div className="break-all text-lg font-semibold leading-tight text-gray-800">
               {currentUser || "未登录"}
             </div>
           </div>
@@ -72,7 +72,7 @@ const TopRightMenu = () => {
                   logout();
                   setIsOpen(false);
                 }}
-                className="w-full text-left text-xl font-semibold text-red-500 hover:text-red-600 transition-colors px-2 py-1"
+                className="w-full px-2 py-1 text-left text-lg font-semibold text-red-500 transition-colors hover:text-red-600"
               >
                 退出登录
               </button>
@@ -83,7 +83,7 @@ const TopRightMenu = () => {
                   setIsOpen(false);
                   navigate("/login");
                 }}
-                className="w-full text-left text-xl font-semibold text-gray-800 hover:text-gray-950 transition-colors px-2 py-1"
+                className="w-full px-2 py-1 text-left text-lg font-semibold text-gray-800 transition-colors hover:text-gray-950"
               >
                 登录
               </button>
