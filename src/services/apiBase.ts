@@ -1,6 +1,15 @@
 let cachedBase: string | null = null;
 
-const defaultFallback = 'http://localhost:8787/api';
+function getDefaultFallback(): string {
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+    const host = window.location.hostname === 'localhost'
+      ? '127.0.0.1'
+      : (window.location.hostname || '127.0.0.1');
+    return `${protocol}//${host}:8787/api`;
+  }
+  return 'http://127.0.0.1:8787/api';
+}
 
 export async function getApiBase(): Promise<string> {
   if (cachedBase) return cachedBase;
@@ -20,7 +29,7 @@ export async function getApiBase(): Promise<string> {
       return cachedBase;
     }
   } catch {}
-  cachedBase = defaultFallback;
+  cachedBase = getDefaultFallback();
   return cachedBase;
 }
 
@@ -29,4 +38,3 @@ export function buildUrl(base: string, path: string): string {
   const p = path.startsWith('/') ? path : `/${path}`;
   return `${b}${p}`;
 }
-
