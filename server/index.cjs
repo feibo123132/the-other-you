@@ -346,6 +346,54 @@ async function submitWithRetry(body, timeoutMs) {
   throw new Error('提交阶段超时');
 }
 
+function toImageUrlArray(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const item of input) {
+    if (typeof item === 'string' && item.trim()) {
+      out.push(item.trim());
+      continue;
+    }
+    if (item && typeof item === 'object') {
+      const maybe = item.url || item.image_url || item.imageUrl || item.uri;
+      if (typeof maybe === 'string' && maybe.trim()) {
+        out.push(maybe.trim());
+      }
+    }
+  }
+  return out;
+}
+
+function toBase64DataUrlArray(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const item of input) {
+    if (typeof item !== 'string' || !item.trim()) continue;
+    const v = item.trim();
+    out.push(v.startsWith('data:') ? v : `data:image/jpeg;base64,${v}`);
+  }
+  return out;
+}
+
+function extractProviderImages(respData) {
+  const candidates = [respData, respData?.data, respData?.result, respData?.output];
+
+  for (const c of candidates) {
+    if (!c || typeof c !== 'object') continue;
+
+    const urls = toImageUrlArray(c.image_urls);
+    if (urls.length > 0) return urls;
+
+    const base64Urls = toBase64DataUrlArray(c.binary_data_base64);
+    if (base64Urls.length > 0) return base64Urls;
+
+    if (typeof c.image_url === 'string' && c.image_url.trim()) return [c.image_url.trim()];
+    if (typeof c.imageUrl === 'string' && c.imageUrl.trim()) return [c.imageUrl.trim()];
+  }
+
+  return [];
+}
+
 async function startWorker() {
   if (workerRunning) return;
   workerRunning = true;
@@ -393,37 +441,42 @@ async function startWorker() {
     broadcast(id, tasks.get(id));
 
     let imageUrls = null;
+    let providerFailedMessage = '';
+    let lastPollError = null;
     while (Date.now() - start < timeoutMs) {
       await sleep(2000);
       try {
         const pollResp = await signAndPost('CVSync2AsyncGetResult', { req_key: 'jimeng_t2i_v40', task_id: taskId });
         const respData = pollResp.data?.data || pollResp.data; // 核心数据层
-        const status = respData?.status;
+        const status = String(respData?.status || respData?.task_status || respData?.state || '').toLowerCase();
         
         console.log(`⏳ 轮询 ${taskId}: ${status}`);
 
-        if (status === 'done') {
+        if (status === 'done' || status === 'success' || status === 'succeeded') {
           console.log("📦 收到 DONE 响应，原始数据:", JSON.stringify(respData).substring(0, 200) + "..."); // 打印日志方便调试
 
-          // === 核心修复：兼容 Base64 和 URL ===
-          if (respData.image_urls && respData.image_urls.length > 0) {
-            imageUrls = respData.image_urls;
-          } else if (respData.binary_data_base64 && respData.binary_data_base64.length > 0) {
-            // 如果返回的是 Base64，我们要给它加上前缀，让浏览器能识别
-            imageUrls = respData.binary_data_base64.map(b64 => `data:image/jpeg;base64,${b64}`);
-            console.log("✅ 成功提取 Base64 图片数据");
-          } else if (respData.image_url) {
-            imageUrls = [respData.image_url];
+          imageUrls = extractProviderImages(respData);
+          if (!imageUrls || imageUrls.length === 0) {
+            lastPollError = new Error('provider_done_but_no_image_payload');
           }
           
           break; // 跳出轮询
         }
-        if (status === 'failed' || status === 'error') {
-          throw new Error('即梦返回 failed');
+        if (status === 'failed' || status === 'error' || status === 'cancelled' || status === 'canceled') {
+          providerFailedMessage = respData?.message || respData?.error || respData?.reason || 'provider_task_failed';
+          break;
         }
       } catch (e) {
+        lastPollError = e;
         console.error('轮询出错:', e.message);
       }
+    }
+
+    if (providerFailedMessage) {
+      console.error(`❌ 任务 ${id} Provider失败: ${providerFailedMessage}`);
+      tasks.set(id, { status: 'failed', progress: 0, message: providerFailedMessage });
+      broadcast(id, tasks.get(id));
+      continue;
     }
 
     if (imageUrls && imageUrls.length > 0) {
@@ -431,9 +484,9 @@ async function startWorker() {
       tasks.set(id, { status: 'done', progress: 100, message: '完成！', imageUrl: imageUrls[0] });
       broadcast(id, tasks.get(id));
     } else {
-      console.error(`💀 任务 ${id} 解析图片失败或超时`);
-      // 这里不报超时，而是报解析错误，方便定位
-      tasks.set(id, { status: 'failed', progress: 0, message: '生成成功但解析图片失败' });
+      const reason = lastPollError?.message || 'result_timeout_or_parse_failed';
+      console.error(`💀 任务 ${id} 失败: ${reason}`);
+      tasks.set(id, { status: 'failed', progress: 0, message: reason });
       broadcast(id, tasks.get(id));
     }
   }
