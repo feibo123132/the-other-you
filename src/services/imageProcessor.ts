@@ -103,14 +103,6 @@ export const validateImageFile = (file: File): { isValid: boolean; error?: strin
 
 export const mergeImages = async (files: File[]): Promise<string> => {
   if (files.length === 0) throw new Error("No images to merge");
-  if (files.length === 1) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(files[0]);
-    });
-  }
 
   const images = await Promise.all(
     files.map(
@@ -124,8 +116,17 @@ export const mergeImages = async (files: File[]): Promise<string> => {
     )
   );
 
-  const totalWidth = images.reduce((sum, img) => sum + img.width, 0);
-  const maxHeight = Math.max(...images.map((img) => img.height));
+  const MAX_OUTPUT_WIDTH = 2048;
+  const MAX_OUTPUT_HEIGHT = 1024;
+
+  const totalWidthRaw = images.reduce((sum, img) => sum + img.width, 0);
+  const maxHeightRaw = Math.max(...images.map((img) => img.height));
+  const scale = Math.min(1, MAX_OUTPUT_WIDTH / totalWidthRaw, MAX_OUTPUT_HEIGHT / maxHeightRaw);
+
+  const scaledWidths = images.map((img) => Math.max(1, Math.round(img.width * scale)));
+  const scaledHeights = images.map((img) => Math.max(1, Math.round(img.height * scale)));
+  const totalWidth = scaledWidths.reduce((sum, w) => sum + w, 0);
+  const maxHeight = Math.max(...scaledHeights);
   const canvas = document.createElement("canvas");
   canvas.width = totalWidth;
   canvas.height = maxHeight;
@@ -133,20 +134,23 @@ export const mergeImages = async (files: File[]): Promise<string> => {
   if (!ctx) throw new Error("Failed to get canvas context");
 
   let currentX = 0;
-  images.forEach((img) => {
-    ctx.drawImage(img, currentX, 0);
-    currentX += img.width;
+  images.forEach((img, index) => {
+    const drawW = scaledWidths[index];
+    const drawH = scaledHeights[index];
+    ctx.drawImage(img, currentX, 0, drawW, drawH);
+    currentX += drawW;
   });
 
-  return canvas.toDataURL("image/jpeg", 0.9);
+  return canvas.toDataURL("image/jpeg", 0.82);
 };
 
 const parseErrorMessage = async (resp: Response, fallback: string) => {
+  const text = await resp.text().catch(() => "");
+  if (!text) return fallback;
   try {
-    const data = await resp.json();
+    const data = JSON.parse(text);
     return data?.message || data?.error || fallback;
   } catch {
-    const text = await resp.text();
     return text || fallback;
   }
 };
@@ -170,6 +174,9 @@ export const startGeneration = async (prompt: string, imageUrl?: string, scale: 
   });
 
   if (!resp.ok) {
+    if (resp.status === 413) {
+      throw new Error("上传图片过大（413），请减少图片数量或压缩后重试");
+    }
     const message = await parseErrorMessage(resp, "生成失败");
     throw new Error(message);
   }
