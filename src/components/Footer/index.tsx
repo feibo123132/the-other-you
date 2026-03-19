@@ -14,13 +14,13 @@ const Footer: React.FC = () => {
         </a>
         
         <a 
-          href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=45052102000181" 
+          href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=45052102000181" 
           target="_blank" 
           rel="noopener noreferrer"
           className="flex items-center gap-1 hover:text-gray-600 transition-colors"
         >
           <img 
-            src="http://www.beian.gov.cn/img/ghs.png" 
+            src="https://www.beian.gov.cn/img/ghs.png" 
             alt="公安备案图标" 
             className="w-4 h-4"
           />

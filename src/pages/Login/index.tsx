@@ -132,7 +132,7 @@ const QUOTE_SOURCE = [
   "杜秋娘《金缕衣》",
 ];
 
-const LOGIN_LOGO_SRC = "/images/login-logo.png";
+const LOGIN_LOGO_SRC = `${import.meta.env.BASE_URL}images/login-logo.png`;
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -304,4 +304,3 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
-

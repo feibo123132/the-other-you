@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n \"backend,frontend\" -c \"blue,green\" \"pnpm run server\" \"pnpm run dev:client -- --host\"",
+    "dev": "concurrently -k -n \"backend,frontend\" -c \"blue,green\" \"npm run server\" \"npm run dev:client -- --host\"",
     "dev:client": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -12,7 +12,7 @@
     "check": "tsc -b --noEmit",
     "server": "node server/index.cjs",
     "start:fake": "sudo node fake_site/fake_server.js",
-    "start": "pnpm run dev"
+    "start": "npm run dev"
   },
   "dependencies": {
     "@types/dagre": "^0.7.53",
@@ -54,5 +54,6 @@
     "typescript-eslint": "^8.30.1",
     "vite": "^6.3.5",
     "vite-tsconfig-paths": "^5.1.4"
-  }
+  },
+  "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be"
 }

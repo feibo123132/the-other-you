@@ -1,6 +1,29 @@
-import { AUTH_TOKEN_KEY, readStorage } from "@/store/authStorage";
+﻿import { AUTH_TOKEN_KEY, readStorage } from "@/store/authStorage";
+import { buildUrl, getApiBase } from "@/services/apiBase";
 
-const API_BASE_URL = "https://jieyouyuzhou.cn/api";
+const API_BASE_FALLBACK = "https://jieyouyuzhou.cn/api";
+let resolvedApiBase: string | null = null;
+let resolvingApiBase: Promise<string> | null = null;
+
+const resolveApiBase = async (): Promise<string> => {
+  if (resolvedApiBase) return resolvedApiBase;
+  if (resolvingApiBase) return resolvingApiBase;
+
+  resolvingApiBase = getApiBase()
+    .then((base) => {
+      resolvedApiBase = base;
+      return base;
+    })
+    .catch(() => {
+      resolvedApiBase = API_BASE_FALLBACK;
+      return API_BASE_FALLBACK;
+    })
+    .finally(() => {
+      resolvingApiBase = null;
+    });
+
+  return resolvingApiBase;
+};
 
 export const compressImage = async (
   file: File,
@@ -134,8 +157,9 @@ export const startGeneration = async (prompt: string, imageUrl?: string, scale: 
     throw new Error("请先登录授权邮箱后再使用AI生图功能");
   }
 
-  const url = `${API_BASE_URL}/generate`;
-  console.log("🚀 [前端] 发起生成请求:", url);
+  const apiBase = await resolveApiBase();
+  const url = buildUrl(apiBase, "/generate");
+
   const resp = await fetch(url, {
     method: "POST",
     headers: {
@@ -147,21 +171,21 @@ export const startGeneration = async (prompt: string, imageUrl?: string, scale: 
 
   if (!resp.ok) {
     const message = await parseErrorMessage(resp, "生成失败");
-    console.error("❌ [前端] 生成请求失败:", message);
     throw new Error(message);
   }
 
   const data = await resp.json();
-  console.log("✅ [前端] 任务创建成功, ID:", data.taskId);
   return data.taskId;
 };
 
-export const subscribeProgress = (
+export const subscribeProgress = async (
   taskId: string,
   onUpdate: (u: { status: string; progress: number; message: string }) => void
-) => {
-  const url = `${API_BASE_URL}/progress/${taskId}`;
+): Promise<EventSource> => {
+  const apiBase = await resolveApiBase();
+  const url = buildUrl(apiBase, `/progress/${taskId}`);
   const es = new EventSource(url);
+
   es.onmessage = (ev) => {
     try {
       const data = JSON.parse(ev.data);
@@ -170,16 +194,20 @@ export const subscribeProgress = (
       console.error("SSE parse error:", e);
     }
   };
+
   return es;
 };
 
 export const fetchResult = async (taskId: string): Promise<string> => {
-  const url = `${API_BASE_URL}/result/${taskId}`;
+  const apiBase = await resolveApiBase();
+  const url = buildUrl(apiBase, `/result/${taskId}`);
   const resp = await fetch(url);
+
   if (!resp.ok) {
     const message = await parseErrorMessage(resp, "获取结果失败");
     throw new Error(message);
   }
+
   const data = await resp.json();
   if (data.imageUrl) return data.imageUrl;
   throw new Error("任务未完成");
@@ -188,4 +216,3 @@ export const fetchResult = async (taskId: string): Promise<string> => {
 export const generateByServer = async (..._args: any[]) => {
   throw new Error("Internal Error: Frontend calling deprecated function");
 };
-

@@ -48,7 +48,7 @@ export const useGeneration = () => {
       const taskId = await startGeneration(customPrompt || selectedOption.promptTemplate, dataUrl, 0.5);
 
       let es: EventSource | null = null;
-      es = subscribeProgress(taskId, (u) => {
+      es = await subscribeProgress(taskId, (u) => {
         setProgress(u.progress);
         setProgressMessage(u.message);
       });

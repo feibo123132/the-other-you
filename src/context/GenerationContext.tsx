@@ -65,12 +65,18 @@ export const GenerationProvider: React.FC<{ children: ReactNode }> = ({ children
     };
 
     // 订阅进度
-    es = subscribeProgress(taskId, (u) => {
+    subscribeProgress(taskId, (u) => {
       updateTask({
         progress: u.progress,
         progressMessage: u.message
       });
-    });
+    })
+      .then((eventSource) => {
+        es = eventSource;
+      })
+      .catch((err) => {
+        console.error(`Subscribe progress failed for task ${taskId}:`, err);
+      });
 
     // 轮询结果
     const pollResult = async () => {
