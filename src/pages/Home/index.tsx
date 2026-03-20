@@ -148,7 +148,7 @@ const Home: React.FC = () => {
         </h1>
         
         <p className="text-gray-600 text-base sm:text-lg">
-          上传照片，体验AI变身乐趣
+          如果去旅行的话，你想去哪里
         </p>
         
         <div className="mt-4 flex justify-center gap-3">
@@ -299,7 +299,7 @@ const Home: React.FC = () => {
             {canGenerate ? (
               <div className="flex items-center justify-center space-x-2">
                 <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
-                <span>开始AI变身</span>
+                <span>启动</span>
               </div>
             ) : (
               '请先上传照片并选择风格'
